@@ -1,0 +1,6 @@
+framework module Pods_184ClearviaSmartSpace {
+  umbrella header "Pods-184ClearviaSmartSpace-umbrella.h"
+
+  export *
+  module * { export * }
+}
