@@ -2,8 +2,8 @@ import Foundation
 import UIKit
 
 enum AppLink: String, CaseIterable {
-    case privacyPolicy = "https://example.com/privacy-policy"
-    case termsOfUse = "https://example.com/terms-of-use"
+    case privacyPolicy = "https://clearviasmart184space.site/privacy/204"
+    case termsOfUse = "https://clearviasmart184space.site/terms/204"
 
     var title: String {
         switch self {
