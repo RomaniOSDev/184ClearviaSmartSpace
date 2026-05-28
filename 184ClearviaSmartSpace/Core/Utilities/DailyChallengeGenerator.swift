@@ -16,7 +16,7 @@ enum DailyChallengeGenerator {
         let baseDifficulties: [Difficulty] = [.easy, .normal, .hard]
         let activity = activities[day % activities.count]
         let difficulty = baseDifficulties[day % baseDifficulties.count]
-        let level = day % 5
+        let level = day % GameContent.levelsPerDifficulty
         return Challenge(
             activityId: activity.id,
             difficulty: difficulty,

@@ -24,6 +24,12 @@ final class ProgressStore: ObservableObject {
         static let speedRunBests = "speedRunBests"
         static let bestComboOverall = "bestComboOverall"
         static let playDaysLog = "playDaysLog"
+        static let endlessBestScores = "endlessBestScores"
+        static let weeklyEventWeekToken = "weeklyEventWeekToken"
+        static let weeklyEventCompleted = "weeklyEventCompleted"
+        static let customTapPattern = "customTapPattern"
+        static let duelWins = "duelWins"
+        static let totalWeeklyEventsCompleted = "totalWeeklyEventsCompleted"
     }
 
     @Published var hasSeenOnboarding: Bool {
@@ -110,6 +116,30 @@ final class ProgressStore: ObservableObject {
         didSet { defaults.set(playDaysLog, forKey: Keys.playDaysLog) }
     }
 
+    @Published var endlessBestScores: [String: Int] {
+        didSet { saveStringIntMap(endlessBestScores, forKey: Keys.endlessBestScores) }
+    }
+
+    @Published var weeklyEventWeekToken: String {
+        didSet { defaults.set(weeklyEventWeekToken, forKey: Keys.weeklyEventWeekToken) }
+    }
+
+    @Published var weeklyEventCompleted: Bool {
+        didSet { defaults.set(weeklyEventCompleted, forKey: Keys.weeklyEventCompleted) }
+    }
+
+    @Published var customTapPattern: [Int] {
+        didSet { defaults.set(customTapPattern, forKey: Keys.customTapPattern) }
+    }
+
+    @Published var duelWins: Int {
+        didSet { defaults.set(duelWins, forKey: Keys.duelWins) }
+    }
+
+    @Published var totalWeeklyEventsCompleted: Int {
+        didSet { defaults.set(totalWeeklyEventsCompleted, forKey: Keys.totalWeeklyEventsCompleted) }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -135,7 +165,15 @@ final class ProgressStore: ObservableObject {
         activitySessions = Self.loadStringIntMap(forKey: Keys.activitySessions, defaults: defaults)
         activityAccuracySum = Self.loadStringDoubleMap(forKey: Keys.activityAccuracySum, defaults: defaults)
         speedRunBests = Self.loadStringIntMap(forKey: Keys.speedRunBests, defaults: defaults)
+        endlessBestScores = Self.loadStringIntMap(forKey: Keys.endlessBestScores, defaults: defaults)
+        weeklyEventWeekToken = defaults.string(forKey: Keys.weeklyEventWeekToken) ?? ""
+        weeklyEventCompleted = defaults.bool(forKey: Keys.weeklyEventCompleted)
+        customTapPattern = defaults.array(forKey: Keys.customTapPattern) as? [Int] ?? [0, 2, 4, 2]
+        duelWins = defaults.integer(forKey: Keys.duelWins)
+        totalWeeklyEventsCompleted = defaults.integer(forKey: Keys.totalWeeklyEventsCompleted)
+        normalizeStoredLevelData()
         refreshDailyChallengeState()
+        refreshWeeklyEventState()
     }
 
     var bestSingleLevelStars: Int {
@@ -158,7 +196,8 @@ final class ProgressStore: ObservableObject {
         ActivityCatalog.all.contains { activity in
             Difficulty.allCases.contains { difficulty in
                 let stars = starsForActivity(activity.id, difficulty: difficulty.storageKey)
-                return stars.count >= 5 && stars.prefix(5).allSatisfy { $0 == 3 }
+                let cleared = stars.filter { $0 >= 3 }.count
+                return cleared >= GameContent.expertHardThreeStarLevelsRequired
             }
         }
     }
@@ -172,7 +211,29 @@ final class ProgressStore: ObservableObject {
     }
 
     func starsForActivity(_ activityId: String, difficulty: String) -> [Int] {
-        starsPerActivity[activityId]?[difficulty] ?? Array(repeating: 0, count: 5)
+        let stored = starsPerActivity[activityId]?[difficulty] ?? []
+        return paddedStars(stored)
+    }
+
+    private func paddedStars(_ values: [Int]) -> [Int] {
+        var result = values
+        while result.count < GameContent.levelsPerDifficulty { result.append(0) }
+        if result.count > GameContent.levelsPerDifficulty {
+            result = Array(result.prefix(GameContent.levelsPerDifficulty))
+        }
+        return result
+    }
+
+    private func normalizeStoredLevelData() {
+        var migratedStars = starsPerActivity
+        for activityId in migratedStars.keys {
+            guard var diffMap = migratedStars[activityId] else { continue }
+            for difficulty in diffMap.keys {
+                diffMap[difficulty] = paddedStars(diffMap[difficulty] ?? [])
+            }
+            migratedStars[activityId] = diffMap
+        }
+        starsPerActivity = migratedStars
     }
 
     func totalStars(for activityId: String) -> Int {
@@ -258,8 +319,7 @@ final class ProgressStore: ObservableObject {
         guard mode.awardsStars else { return }
 
         var activityStars = starsPerActivity[activityId] ?? [:]
-        var levelStars = activityStars[difficulty] ?? Array(repeating: 0, count: 5)
-        while levelStars.count < 5 { levelStars.append(0) }
+        var levelStars = paddedStars(activityStars[difficulty] ?? [])
         let previous = levelStars[level]
         var finalStars = max(previous, earned)
 
@@ -274,7 +334,7 @@ final class ProgressStore: ObservableObject {
         if finalStars >= 1 {
             var unlocked = unlockedLevels[activityId] ?? [:]
             let current = unlocked[difficulty] ?? 0
-            if level + 1 < 5 {
+            if level + 1 < GameContent.levelsPerDifficulty {
                 unlocked[difficulty] = max(current, level + 1)
             } else {
                 unlocked[difficulty] = max(current, level)
@@ -292,6 +352,56 @@ final class ProgressStore: ObservableObject {
         if mode == .dailyChallenge, earned >= 1 {
             completeDailyChallengeIfNeeded()
         }
+        if mode == .weeklyEvent, earned >= 1 {
+            completeWeeklyEventIfNeeded()
+        }
+        if mode.recordsProgress {
+            let stars = totalStarsEarned
+            Task { @MainActor in
+                GameCenterManager.shared.submitTotalStars(stars)
+            }
+        }
+    }
+
+    func recordEndlessWave(activityId: String, wave: Int) {
+        registerPlayDay()
+        let current = endlessBestScores[activityId] ?? 0
+        if wave > current {
+            endlessBestScores[activityId] = wave
+            Task { @MainActor in
+                GameCenterManager.shared.submitEndlessScore(wave, activityId: activityId)
+            }
+        }
+    }
+
+    func completeWeeklyEventIfNeeded() {
+        let event = WeeklyEventGenerator.current()
+        refreshWeeklyEventState()
+        guard weeklyEventWeekToken == event.weekToken, !weeklyEventCompleted else { return }
+        weeklyEventCompleted = true
+        totalWeeklyEventsCompleted += 1
+        totalStarsEarned += WeeklyEventGenerator.current().bonusStars
+    }
+
+    func isWeeklyEventAvailable() -> Bool {
+        refreshWeeklyEventState()
+        return !weeklyEventCompleted
+    }
+
+    func refreshWeeklyEventState() {
+        let token = WeeklyEventGenerator.current().weekToken
+        if weeklyEventWeekToken != token {
+            weeklyEventWeekToken = token
+            weeklyEventCompleted = false
+        }
+    }
+
+    func saveCustomTapPattern(_ pattern: [Int]) {
+        customTapPattern = pattern.isEmpty ? [0, 2, 4] : pattern
+    }
+
+    func recordDuelWin() {
+        duelWins += 1
     }
 
     func recordSpeedRun(activityId: String, totalSeconds: Int, completed: Bool) {
@@ -333,13 +443,21 @@ final class ProgressStore: ObservableObject {
         speedRunBests = [:]
         bestComboOverall = 0
         playDaysLog = []
+        endlessBestScores = [:]
+        weeklyEventWeekToken = ""
+        weeklyEventCompleted = false
+        customTapPattern = [0, 2, 4, 2]
+        duelWins = 0
+        totalWeeklyEventsCompleted = 0
 
         let keys = [
             Keys.hasSeenOnboarding, Keys.totalActivitiesPlayed, Keys.totalStarsEarned, Keys.totalPlayTimeSeconds,
             Keys.starsPerActivity, Keys.unlockedLevels, Keys.streakCount, Keys.personalBests, Keys.dailyChallengeDay,
             Keys.dailyChallengeCompleted, Keys.totalDailyChallengesCompleted, Keys.lastPlayDay, Keys.playStreakDays,
             Keys.activitySessions, Keys.activityAccuracySum, Keys.completedTutorials, Keys.selectedTheme,
-            Keys.expertUnlockedActivities, Keys.speedRunBests, Keys.bestComboOverall, Keys.playDaysLog
+            Keys.expertUnlockedActivities, Keys.speedRunBests, Keys.bestComboOverall, Keys.playDaysLog,
+            Keys.endlessBestScores, Keys.weeklyEventWeekToken, Keys.weeklyEventCompleted, Keys.customTapPattern, Keys.duelWins,
+            Keys.totalWeeklyEventsCompleted
         ]
         keys.forEach { defaults.removeObject(forKey: $0) }
         refreshDailyChallengeState()
@@ -449,7 +567,8 @@ final class ProgressStore: ObservableObject {
 
     private func evaluateExpertUnlock(for activityId: String) {
         let hardStars = starsForActivity(activityId, difficulty: Difficulty.hard.storageKey)
-        guard hardStars.count >= 5, hardStars.prefix(5).allSatisfy({ $0 >= 3 }) else { return }
+        let perfectCount = hardStars.filter { $0 >= 3 }.count
+        guard perfectCount >= GameContent.expertHardThreeStarLevelsRequired else { return }
         if !expertUnlockedActivities.contains(activityId) {
             expertUnlockedActivities.append(activityId)
         }

@@ -20,6 +20,7 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .home: HomeView()
+                case .campaign: CampaignMapView()
                 case .achievements: AchievementsView()
                 case .settings: SettingsView()
                 }

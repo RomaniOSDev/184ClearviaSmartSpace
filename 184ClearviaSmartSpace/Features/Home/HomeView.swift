@@ -4,6 +4,7 @@ struct HomeView: View {
     @EnvironmentObject private var progress: ProgressStore
     @State private var navigationPath = NavigationPath()
     @State private var dailyChallengeConfig: GameSessionConfig?
+    @State private var weeklyEventConfig: GameSessionConfig?
     @State private var continueConfig: GameSessionConfig?
 
     var body: some View {
@@ -18,10 +19,19 @@ struct HomeView: View {
                             sessions: progress.totalActivitiesPlayed
                         )
 
+                        Text("\(TrackCatalog.allTracks().count) tracks • \(GameContent.campaignWorldCount) worlds")
+                            .font(.caption.bold())
+                            .foregroundStyle(Color("AppAccent"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                         HomeWidgetGrid()
 
                         HomeDailyWidget { config in
                             dailyChallengeConfig = config
+                        }
+
+                        HomeWeeklyEventWidget { config in
+                            weeklyEventConfig = config
                         }
 
                         if let suggestion = continueSuggestion {
@@ -69,6 +79,9 @@ struct HomeView: View {
             .navigationDestination(item: $dailyChallengeConfig) { config in
                 ActivityGameHost(config: config)
             }
+            .navigationDestination(item: $weeklyEventConfig) { config in
+                ActivityGameHost(config: config)
+            }
             .navigationDestination(item: $continueConfig) { config in
                 ActivityGameHost(config: config)
             }
@@ -81,7 +94,7 @@ struct HomeView: View {
         for activity in ActivityCatalog.all {
             for difficulty in Difficulty.standardCases {
                 let highest = progress.highestUnlockedLevel(activityId: activity.id, difficulty: difficulty.storageKey)
-                let level = min(highest, 4)
+                let level = min(highest, GameContent.levelsPerDifficulty - 1)
                 let stars = progress.stars(for: activity.id, difficulty: difficulty.storageKey, level: level)
                 if stars < 3 {
                     let suggestion = ContinueSuggestion(
@@ -118,7 +131,7 @@ struct HomeView: View {
     private func bestAccuracy(for activityId: String) -> Double {
         var best = 0.0
         for difficulty in Difficulty.allCases {
-            for level in 0..<5 {
+            for level in 0..<GameContent.levelsPerDifficulty {
                 if let record = progress.personalBest(for: activityId, difficulty: difficulty, level: level) {
                     best = max(best, record.bestAccuracy)
                 }

@@ -13,9 +13,12 @@ struct TapSequenceView: View {
     init(config: GameSessionConfig) {
         self.config = config
         _viewModel = StateObject(wrappedValue: TapSequenceViewModel(
+            activityId: config.activityId,
             difficulty: config.difficulty,
-            level: config.level,
-            isPractice: config.mode == .practice
+            level: config.effectiveLevel,
+            isPractice: config.mode == .practice,
+            mode: config.mode,
+            customPattern: config.customPatternNotes
         ))
     }
 
@@ -29,24 +32,27 @@ struct TapSequenceView: View {
             }
         }
         .navigationBarBackButtonHidden(showResult)
+        .navigationTitle(config.track.title)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear { achievementSnapshot = progress.achievementSnapshot() }
         .onChange(of: viewModel.phase) { phase in
-            if phase == .success { finishLevel() }
-            if phase == .failed && config.mode == .speedRun {
-                NotificationCenter.default.post(name: .speedRunLevelComplete, object: nil, userInfo: ["success": false])
+            if phase == .success { finishLevel(success: true) }
+            if phase == .failed, config.mode == .endless || config.mode == .speedRun {
+                finishLevel(success: false)
             }
         }
         .overlay {
-            if viewModel.showFailModal && !showResult {
+            if viewModel.showFailModal && !showResult && config.mode != .endless {
                 failOverlay
             }
         }
     }
 
     private var gameContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
+            InGameHintBar(text: ActivityHintProvider.hint(activityId: config.activityId, mode: config.mode))
             HStack {
-                Text(config.mode == .practice ? "Practice Mode" : "Tap Sequence")
+                Text(config.track.title)
                     .font(.headline)
                     .foregroundStyle(Color("AppTextPrimary"))
                 Spacer()
@@ -130,7 +136,7 @@ struct TapSequenceView: View {
             stars: config.mode == .practice ? 0 : viewModel.earnedStars,
             primaryMetric: "\(Int(viewModel.accuracy * 100))%",
             metricLabel: config.mode == .practice ? "Practice Complete" : "Accuracy",
-            showNextLevel: config.mode == .standard && config.level < 4,
+            showNextLevel: config.mode == .standard && config.level < GameContent.levelsPerDifficulty - 1,
             newlyUnlocked: newlyUnlocked,
             onNextLevel: { dismiss() },
             onRetry: { showResult = false; viewModel.setupLevel() },
@@ -138,12 +144,9 @@ struct TapSequenceView: View {
         )
     }
 
-    private func finishLevel() {
-        if config.mode == .speedRun {
-            NotificationCenter.default.post(name: .speedRunLevelComplete, object: nil, userInfo: ["success": true])
-            return
-        }
-        guard !showResult else { return }
+    private func finishLevel(success: Bool = true) {
+        if GameSessionCoordinator.reportCompletion(config: config, success: success) { return }
+        guard success, !showResult else { return }
         let snapshot = achievementSnapshot ?? progress.achievementSnapshot()
         if config.recordsProgress {
             progress.recordLevelResult(

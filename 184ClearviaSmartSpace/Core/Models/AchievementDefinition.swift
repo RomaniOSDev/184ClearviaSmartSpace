@@ -89,12 +89,15 @@ enum AchievementCatalog {
         AchievementDefinition(
             id: "activity_master",
             title: "Activity Master",
-            description: "Got 3 stars on every level of one activity.",
+            description: "Got 3 stars on 12+ tracks in one activity.",
             iconName: "medal.fill",
             isHidden: false,
             isUnlocked: { $0.hasFullActivityThreeStars },
             progress: { store in
-                AchievementProgress(current: store.maxPerfectLevelsInOneActivity, target: 5)
+                AchievementProgress(
+                    current: store.maxPerfectLevelsInOneActivity,
+                    target: GameContent.expertHardThreeStarLevelsRequired
+                )
             }
         ),
         AchievementDefinition(
@@ -114,6 +117,45 @@ enum AchievementCatalog {
             isHidden: true,
             isUnlocked: { $0.totalDailyChallengesCompleted >= 5 },
             progress: { AchievementProgress(current: $0.totalDailyChallengesCompleted, target: 5) }
+        ),
+        AchievementDefinition(
+            id: "endless_runner",
+            title: "Endless Runner",
+            description: "Survived 10 waves in Endless mode.",
+            iconName: "infinity",
+            isHidden: false,
+            isUnlocked: { store in store.endlessBestScores.values.contains(where: { $0 >= 10 }) },
+            progress: {
+                let best = $0.endlessBestScores.values.max() ?? 0
+                return AchievementProgress(current: best, target: 10)
+            }
+        ),
+        AchievementDefinition(
+            id: "weekly_spotlight",
+            title: "Weekly Spotlight",
+            description: "Completed a weekly spotlight event.",
+            iconName: "sparkles",
+            isHidden: false,
+            isUnlocked: { $0.totalWeeklyEventsCompleted >= 1 },
+            progress: { AchievementProgress(current: $0.totalWeeklyEventsCompleted, target: 1) }
+        ),
+        AchievementDefinition(
+            id: "duel_champion",
+            title: "Duel Champion",
+            description: "Won 3 local duels.",
+            iconName: "person.2.fill",
+            isHidden: true,
+            isUnlocked: { $0.duelWins >= 3 },
+            progress: { AchievementProgress(current: $0.duelWins, target: 3) }
+        ),
+        AchievementDefinition(
+            id: "campaign_explorer",
+            title: "Campaign Explorer",
+            description: "Earned 100 total stars.",
+            iconName: "map.fill",
+            isHidden: false,
+            isUnlocked: { $0.totalStarsEarned >= 100 },
+            progress: { AchievementProgress(current: $0.totalStarsEarned, target: 100) }
         ),
         AchievementDefinition(
             id: "combo_king",

@@ -16,7 +16,7 @@ struct MelodyHoldView: View {
         self.config = config
         _viewModel = StateObject(wrappedValue: MelodyHoldViewModel(
             difficulty: config.difficulty,
-            level: config.level,
+            level: config.effectiveLevel,
             isPractice: config.mode == .practice
         ))
     }
@@ -32,6 +32,8 @@ struct MelodyHoldView: View {
             }
         }
         .navigationBarBackButtonHidden(showResult)
+        .navigationTitle(config.track.title)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             achievementSnapshot = progress.achievementSnapshot()
         }
@@ -39,11 +41,13 @@ struct MelodyHoldView: View {
             if phase == .success { finishLevel(success: true) }
             else if phase == .failed {
                 triggerShake()
-                if config.mode == .speedRun { finishLevel(success: false) }
+                if config.mode == .endless || config.mode == .speedRun {
+                    finishLevel(success: false)
+                }
             }
         }
         .overlay {
-            if viewModel.showFailModal && !showResult {
+            if viewModel.showFailModal && !showResult && config.mode != .endless {
                 failOverlay
             }
         }
@@ -51,6 +55,7 @@ struct MelodyHoldView: View {
 
     private var gameContent: some View {
         VStack(spacing: 12) {
+            InGameHintBar(text: ActivityHintProvider.hint(activityId: config.activityId, mode: config.mode))
             statusBar
             GeometryReader { geo in
                 ZStack {
@@ -167,7 +172,7 @@ struct MelodyHoldView: View {
             stars: config.mode == .practice ? 0 : viewModel.earnedStars,
             primaryMetric: "\(viewModel.successfulLandings)",
             metricLabel: config.mode == .practice ? "Practice Complete" : "Perfect Landings",
-            showNextLevel: config.mode == .standard && config.level < 4 && viewModel.phase == .success,
+            showNextLevel: config.mode == .standard && config.level < GameContent.levelsPerDifficulty - 1 && viewModel.phase == .success,
             newlyUnlocked: newlyUnlocked,
             onNextLevel: { dismiss() },
             onRetry: {
@@ -179,10 +184,7 @@ struct MelodyHoldView: View {
     }
 
     private func finishLevel(success: Bool) {
-        if config.mode == .speedRun {
-            NotificationCenter.default.post(name: .speedRunLevelComplete, object: nil, userInfo: ["success": success])
-            return
-        }
+        if GameSessionCoordinator.reportCompletion(config: config, success: success) { return }
         guard success, !showResult else { return }
         let snapshot = achievementSnapshot ?? progress.achievementSnapshot()
         if config.recordsProgress {

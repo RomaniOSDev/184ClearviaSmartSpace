@@ -8,10 +8,10 @@ struct LevelMapView: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
-                ForEach(0..<5, id: \.self) { level in
+                ForEach(0..<GameContent.levelsPerDifficulty, id: \.self) { level in
                     HStack(spacing: 0) {
                         levelNode(level: level)
-                        if level < 4 {
+                        if level < GameContent.levelsPerDifficulty - 1 {
                             connector(filled: progress.stars(
                                 for: activityId,
                                 difficulty: difficulty.storageKey,

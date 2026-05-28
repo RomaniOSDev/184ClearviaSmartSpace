@@ -27,6 +27,9 @@ final class TapSequenceViewModel: ObservableObject {
     let difficulty: Difficulty
     let level: Int
     let isPractice: Bool
+    let mode: GameMode
+    let activityId: String
+    let customPattern: [Int]
 
     private var sequenceLength: Int {
         let base: Int
@@ -48,10 +51,20 @@ final class TapSequenceViewModel: ObservableObject {
         StarCalculator.stars(for: accuracy)
     }
 
-    init(difficulty: Difficulty, level: Int, isPractice: Bool) {
+    init(
+        activityId: String,
+        difficulty: Difficulty,
+        level: Int,
+        isPractice: Bool,
+        mode: GameMode = .standard,
+        customPattern: [Int] = []
+    ) {
+        self.activityId = activityId
         self.difficulty = difficulty
         self.level = level
         self.isPractice = isPractice
+        self.mode = mode
+        self.customPattern = customPattern
         setupLevel()
     }
 
@@ -64,7 +77,14 @@ final class TapSequenceViewModel: ObservableObject {
         inputIndex = 0
         showFailModal = false
         phase = .showing
-        sequence = (0..<sequenceLength).map { _ in Int.random(in: 0..<6) }
+        if mode == .customPattern, !customPattern.isEmpty {
+            sequence = customPattern
+        } else {
+            var generator = SeededRandomNumberGenerator(
+                seed: UInt64(TrackCatalog.patternSeed(activityId: activityId, level: level))
+            )
+            sequence = (0..<sequenceLength).map { _ in Int.random(in: 0..<6, using: &generator) }
+        }
         playSequence()
     }
 
@@ -128,5 +148,18 @@ final class TapSequenceViewModel: ObservableObject {
         showFailModal = false
         phase = .showing
         setupLevel()
+    }
+}
+
+private struct SeededRandomNumberGenerator: RandomNumberGenerator {
+    var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed == 0 ? 1 : seed
+    }
+
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1
+        return state
     }
 }

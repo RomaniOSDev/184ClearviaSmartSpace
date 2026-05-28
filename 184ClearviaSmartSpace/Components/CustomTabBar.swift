@@ -2,12 +2,14 @@ import SwiftUI
 
 enum MainTab: Int, CaseIterable {
     case home
+    case campaign
     case achievements
     case settings
 
     var title: String {
         switch self {
         case .home: "Home"
+        case .campaign: "Campaign"
         case .achievements: "Achievements"
         case .settings: "Settings"
         }
@@ -16,6 +18,7 @@ enum MainTab: Int, CaseIterable {
     var iconName: String {
         switch self {
         case .home: "house.fill"
+        case .campaign: "map.fill"
         case .achievements: "trophy.fill"
         case .settings: "gearshape.fill"
         }

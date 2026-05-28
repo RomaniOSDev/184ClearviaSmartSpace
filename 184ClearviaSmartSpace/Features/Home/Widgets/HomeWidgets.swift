@@ -205,6 +205,50 @@ struct HomeDailyWidget: View {
     }
 }
 
+struct HomeWeeklyEventWidget: View {
+    @EnvironmentObject private var progress: ProgressStore
+    let onPlay: (GameSessionConfig) -> Void
+
+    private var event: WeeklyEventGenerator.Event {
+        WeeklyEventGenerator.current()
+    }
+
+    var body: some View {
+        let completed = !progress.isWeeklyEventAvailable()
+        let track = TrackCatalog.track(activityId: event.activityId, level: event.level)
+
+        VStack(spacing: 0) {
+            ActivityArtworkView(style: ActivityArtworkStyle(activityId: event.activityId), animate: !completed)
+                .frame(height: 100)
+
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeaderView(title: "Weekly Spotlight", subtitle: event.title, iconName: "sparkles")
+                Text("\(track.title) • \(event.difficulty.rawValue) • +\(event.bonusStars) bonus stars")
+                    .font(.caption.bold())
+                    .foregroundStyle(Color("AppTextSecondary"))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if !completed {
+                    AppButton(title: "Play Weekly Event", icon: "play.fill") {
+                        onPlay(GameSessionConfig(
+                            activityId: event.activityId,
+                            difficulty: event.difficulty,
+                            level: event.level,
+                            mode: .weeklyEvent
+                        ))
+                    }
+                } else {
+                    StatusPillView(text: "Completed This Week", style: .success)
+                }
+            }
+            .padding(16)
+        }
+        .background(ElevatedSurfaceBackground(cornerRadius: 20, accentBorder: true))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .appElevationShadow()
+    }
+}
+
 struct HomeStreakWidget: View {
     @EnvironmentObject private var progress: ProgressStore
 

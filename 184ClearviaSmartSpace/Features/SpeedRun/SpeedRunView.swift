@@ -40,7 +40,7 @@ struct SpeedRunView: View {
     private var speedRunHeader: some View {
         SurfaceCard {
             HStack {
-                Label("Level \(currentLevel + 1)/5", systemImage: "flag.checkered")
+                Label("Level \(currentLevel + 1)/\(GameContent.speedRunLevelCount)", systemImage: "flag.checkered")
                 Spacer()
                 Label(elapsedFormatted, systemImage: "timer")
             }
@@ -66,7 +66,7 @@ struct SpeedRunView: View {
                         Text(elapsedFormatted)
                             .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundStyle(Color("AppAccent"))
-                        Text("\(completedLevels)/5 levels cleared")
+                        Text("\(completedLevels)/\(GameContent.speedRunLevelCount) levels cleared")
                             .foregroundStyle(Color("AppTextSecondary"))
                     }
                     .frame(maxWidth: .infinity)
@@ -87,7 +87,7 @@ struct SpeedRunView: View {
         guard let success = notification.userInfo?["success"] as? Bool else { return }
         if success {
             completedLevels += 1
-            if currentLevel >= 4 {
+            if currentLevel >= GameContent.speedRunLevelCount - 1 {
                 progress.recordSpeedRun(activityId: activity.id, totalSeconds: max(0, Int(Date().timeIntervalSince(runStart))), completed: true)
                 showSummary = true
             } else {

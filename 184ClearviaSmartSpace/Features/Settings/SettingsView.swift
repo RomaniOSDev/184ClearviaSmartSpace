@@ -114,6 +114,11 @@ struct SettingsView: View {
                     HapticService.lightTap()
                     openTermsOfUse()
                 }
+                SettingsCell(title: "Leaderboards", icon: "list.number", subtitle: "Game Center rankings") {
+                    Task { @MainActor in
+                        GameCenterManager.shared.presentLeaderboards()
+                    }
+                }
             }
         }
     }

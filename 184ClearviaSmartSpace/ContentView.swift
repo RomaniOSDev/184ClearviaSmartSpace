@@ -18,7 +18,12 @@ struct ContentView: View {
         .environmentObject(themeStore)
         .environment(\.themePalette, themeStore.palette)
         .preferredColorScheme(.dark)
-        .onAppear { themeStore.sync(from: progress) }
+        .onAppear {
+            themeStore.sync(from: progress)
+            Task { @MainActor in
+                GameCenterManager.shared.authenticateIfNeeded()
+            }
+        }
     }
 }
 

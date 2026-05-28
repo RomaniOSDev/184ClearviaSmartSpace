@@ -32,9 +32,11 @@ struct LevelSelectionView: View {
                         icon: "figure.walk"
                     )
                     difficultySection
+                    trackLibrarySection
+                    modesHubSection
                     mapSection
                     levelsSection
-                    AppButton(title: "Speed Run — All 5 Levels", icon: "timer") {
+                    AppButton(title: "Speed Run — \(GameContent.speedRunLevelCount) Levels", icon: "timer") {
                         HapticService.mediumTap()
                         showSpeedRun = true
                     }
@@ -112,11 +114,23 @@ struct LevelSelectionView: View {
         }
     }
 
+    private var trackLibrarySection: some View {
+        TrackLibraryView(activity: activity)
+    }
+
+    private var modesHubSection: some View {
+        ModesHubView(activity: activity)
+    }
+
     private var levelsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeaderView(title: "Levels", subtitle: "Tap an unlocked level to play", iconName: "square.grid.3x3.fill")
+            SectionHeaderView(
+                title: "Quick Levels",
+                subtitle: "\(GameContent.levelsPerDifficulty) tracks per difficulty",
+                iconName: "square.grid.3x3.fill"
+            )
             LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(0..<5, id: \.self) { level in
+                ForEach(0..<GameContent.levelsPerDifficulty, id: \.self) { level in
                     levelCell(level: level)
                 }
             }
@@ -155,5 +169,5 @@ struct LevelSelectionView: View {
 }
 
 extension GameSessionConfig: Identifiable {
-    var id: String { "\(activityId)_\(difficulty.storageKey)_\(level)_\(mode.rawValue)" }
+    var id: String { "\(activityId)_\(difficulty.storageKey)_\(level)_\(mode.rawValue)_\(endlessWave)_\(customPatternNotes.hashValue)" }
 }
